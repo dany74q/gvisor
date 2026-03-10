@@ -245,6 +245,9 @@ func (vfs *VirtualFilesystem) AccessAt(ctx context.Context, creds *auth.Credenti
 // file must exist. A reference is taken on the returned VirtualDentry.
 func (vfs *VirtualFilesystem) GetDentryAt(ctx context.Context, creds *auth.Credentials, pop *PathOperation, opts *GetDentryOptions) (VirtualDentry, error) {
 	rp := vfs.getResolvingPath(creds, pop)
+	if opts.NoFollowMount {
+		rp.flags |= rpflagsNoFollowMount
+	}
 	defer rp.Release(ctx)
 	for {
 		if err := vfs.maybeBlockOnMountPromise(ctx, rp); err != nil {

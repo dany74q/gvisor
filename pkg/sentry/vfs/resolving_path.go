@@ -66,6 +66,7 @@ const (
 	rpflagsHaveMountRef       = 1 << iota // do we hold a reference on mount?
 	rpflagsHaveStartRef                   // do we hold a reference on start?
 	rpflagsFollowFinalSymlink             // same as PathOperation.FollowFinalSymlink
+	rpflagsNoFollowMount                  // same as GetDentryOptions.NoFollowMount
 )
 
 func init() {
@@ -307,6 +308,9 @@ func (rp *ResolvingPath) CheckRoot(ctx context.Context, d *Dentry) (bool, error)
 // another Mount, CheckMount returns a non-nil error. Otherwise, CheckMount
 // returns nil.
 func (rp *ResolvingPath) CheckMount(ctx context.Context, d *Dentry) error {
+	if rp.flags&rpflagsNoFollowMount != 0 {
+		return nil
+	}
 	if !d.isMounted() {
 		return nil
 	}

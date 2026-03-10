@@ -28,6 +28,9 @@ type GetDentryOptions struct {
 	// the returned Dentry is a directory for which creds has search
 	// permission.
 	CheckSearchable bool
+
+	// If NoFollowMount is true, path resolution will not follow mount points.
+	NoFollowMount bool
 }
 
 // MkdirOptions contains options to VirtualFilesystem.MkdirAt() and

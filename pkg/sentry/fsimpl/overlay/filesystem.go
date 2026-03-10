@@ -219,7 +219,7 @@ func (fs *filesystem) lookupLocked(ctx context.Context, parent *dentry, name str
 			Root:  parentVD,
 			Start: parentVD,
 			Path:  childPath,
-		}, &vfs.GetDentryOptions{})
+		}, &vfs.GetDentryOptions{NoFollowMount: true})
 		if linuxerr.Equals(linuxerr.ENOENT, err) || linuxerr.Equals(linuxerr.ENAMETOOLONG, err) {
 			// The file doesn't exist on this layer. Proceed to the next one.
 			return true

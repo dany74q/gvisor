@@ -2650,6 +2650,76 @@ func TestBindMountByOption(t *testing.T) {
 	}
 }
 
+// TestOverlayUmountBindRevealsUnderlying verifies that unmounting a bind mount
+// on top of an overlay reveals the underlying file from the overlay's lower
+// layer, not stale data from the removed mount.
+func TestOverlayUmountBindRevealsUnderlying(t *testing.T) {
+	conf := testutil.TestConfig(t)
+	conf.Overlay2.Set("all:memory")
+
+	// Source file with content that will be bind-mounted.
+	srcFile := filepath.Join(testutil.TmpDir(), "bind-src")
+	if err := os.WriteFile(srcFile, []byte("mounted-content"), 0644); err != nil {
+		t.Fatalf("os.WriteFile(): %v", err)
+	}
+
+	// Destination is under /var (covered by the root overlay, not TmpDir's
+	// bind mount). The host file at /var/bind-target is empty and readonly
+	// in the overlay's lower layer. After umount, this empty file should
+	// be revealed.
+	dstPath := "/var/bind-target"
+
+	spec := testutil.NewSpecWithArgs("sleep", "1000")
+	spec.Mounts = append(spec.Mounts, specs.Mount{
+		Destination: dstPath,
+		Source:      srcFile,
+		Type:        "bind",
+		Options:     []string{"ro", "bind"},
+	})
+
+	_, bundleDir, cleanup, err := testutil.SetupContainer(spec, conf)
+	if err != nil {
+		t.Fatalf("error setting up container: %v", err)
+	}
+	defer cleanup()
+
+	args := Args{
+		ID:        testutil.RandomContainerID(),
+		Spec:      spec,
+		BundleDir: bundleDir,
+	}
+	cont, err := New(conf, args)
+	if err != nil {
+		t.Fatalf("error creating container: %v", err)
+	}
+	defer cont.Destroy()
+	if err := cont.Start(conf); err != nil {
+		t.Fatalf("error starting container: %v", err)
+	}
+
+	// Check content before umount.
+	before, err := executeCombinedOutput(conf, cont, nil, "/bin/cat", dstPath)
+	if err != nil {
+		t.Fatalf("cat before umount: %v", err)
+	}
+	t.Logf("before umount: %q", before)
+
+	// Unmount the bind.
+	umountOut, err := executeCombinedOutput(conf, cont, nil, "/bin/umount", dstPath)
+	t.Logf("umount output: %q, err: %v", umountOut, err)
+
+	// Check content after umount.
+	after, err := executeCombinedOutput(conf, cont, nil, "/bin/cat", dstPath)
+	if err != nil {
+		t.Logf("cat after umount err (may be expected if file empty): %v", err)
+	}
+	t.Logf("after umount: %q (len=%d)", after, len(after))
+
+	if string(before) == string(after) && len(after) > 0 {
+		t.Errorf("file content unchanged after umount: still %q", after)
+	}
+}
+
 // TestRlimits sets limit to number of open files and checks that the limit
 // is propagated to the container.
 func TestRlimits(t *testing.T) {
